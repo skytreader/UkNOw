@@ -127,3 +127,12 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Generic stuff
+*.swp
+*~
+*.out
+*.log.*
+*.bak
+bin/
+lib64
