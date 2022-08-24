@@ -1,4 +1,4 @@
-from .uno import UnoDeck, UnoCardType
+from .uno import CardPlayRequirement, UnoDeck, UnoCardType
 
 import unittest
 import unittest.mock
@@ -24,3 +24,25 @@ class UnoDeckTests(unittest.TestCase):
 
         self.assertIsNone(self.deck.draw())
         self.assertEqual(0, len(self.deck))
+
+class CardPlayRequirementTest(unittest.TestCase):
+
+    def test_satisfies_numeric_cards(self):
+        require_green_0 = CardPlayRequirement("GREEN", 0)
+        self.assertTrue(require_green_0.is_satisfied(UnoCardType.GREEN_1.name))
+        self.assertTrue(require_green_0.is_satisfied(UnoCardType.RED_0.name))
+        self.assertTrue(require_green_0.is_satisfied(UnoCardType.GREEN_SKIP.name))
+        self.assertTrue(require_green_0.is_satisfied(UnoCardType.WILD.name))
+        self.assertTrue(require_green_0.is_satisfied(UnoCardType.WILDFOUR.name))
+        self.assertFalse(require_green_0.is_satisfied(UnoCardType.RED_1.name))
+        self.assertFalse(require_green_0.is_satisfied(UnoCardType.RED_SKIP.name))
+
+    def test_wildcard(self):
+        # The wildcard requirement is characterized as having no number specified
+        require_wildcard = CardPlayRequirement("GREEN")
+        self.assertTrue(require_wildcard.is_satisfied(UnoCardType.GREEN_1.name))
+        self.assertTrue(require_wildcard.is_satisfied(UnoCardType.GREEN_0.name))
+        self.assertTrue(require_wildcard.is_satisfied(UnoCardType.WILD.name))
+        self.assertTrue(require_wildcard.is_satisfied(UnoCardType.WILDFOUR.name))
+        self.assertFalse(require_wildcard.is_satisfied(UnoCardType.RED_0.name))
+        self.assertFalse(require_wildcard.is_satisfied("GREEN"))

@@ -1,9 +1,10 @@
-from typing import Dict, Set
+from typing import Dict, Literal, Optional, Set
 
 import enum
 import random
 
 CARD_COLORS = ("RED", "YELLOW", "GREEN", "BLUE")
+CARD_COLORS_TYPE = Literal["RED", "YELLOW", "GREEN", "BLUE"]
 ACTION_CARDS = ("SKIP", "DRAWTWO", "REVERSE")
 
 def create_cardtype_enum():
@@ -66,3 +67,32 @@ class UnoDeck(object):
             return card
         else:
             return None
+
+class CardPlayRequirement(object):
+
+    def __init__(self, color: CARD_COLORS_TYPE, number: Optional[int] = None):
+        self.color = color
+        self.number = number
+
+    def is_satisfied(self, card: str) -> bool:
+        """
+        You can get valid arguments via the `name` field of the `UnoCardType`
+        enum.
+        """
+        if card in (UnoCardType.WILD.name, UnoCardType.WILDFOUR.name):
+            return True
+
+        cardparse = card.split("_")
+        if self.number is not None:
+            try:
+                return self.color == cardparse[0] or self.number == int(cardparse[1])
+            except ValueError:
+                return False
+        else:
+            return len(cardparse) == 2 and self.color == cardparse[0]
+
+class PlayerActionConstraints(object):
+
+    def __init__(self, must_draw: int, must_play: CardPlayRequirement):
+        self.must_draw = must_draw
+        self.must_play = must_play
