@@ -34,37 +34,42 @@ class UnoDeck(object):
         self.deck: Dict[UnoCardType, int] = {}
         self.deck[UnoCardType.WILD] = 4
         self.deck[UnoCardType.WILDFOUR] = 4
-        self.non_zeros: Set[UnoCardType] = set([UnoCardType.WILD, UnoCardType.WILDFOUR])
 
         for color in CARD_COLORS:
             card_zero = UnoCardType["%s_0" % color]
             self.deck[card_zero] = 1
-            self.non_zeros.add(card_zero)
 
             for n in range(1, 10):
                 card_n = UnoCardType["%s_%d" % (color, n)]
                 self.deck[card_n] = 2
-                self.non_zeros.add(card_n)
 
             for act in ACTION_CARDS:
                 action_card = UnoCardType["%s_%s" % (color, act)]
                 self.deck[action_card] = 2
-                self.non_zeros.add(action_card)
 
     def __len__(self):
         return sum([self.deck[k] for k in self.deck.keys()])
 
     def draw(self):
         """
-        Randomly gets a card from the deck.
+        Randomly gets a card from the deck. This effective removes the card from
+        the deck.
         """
-        if self.non_zeros:
-            card = random.choice(list(self.non_zeros))
+        ks = list(self.deck.keys())
+        if ks:
+            card = random.choice(ks)
             self.deck[card] -= 1
+            assert self.deck[card] >= 0
             if not self.deck[card]:
-                self.non_zeros.remove(card)
+                del self.deck[card]
 
             return card
+        else:
+            return None
+
+    def count(self, card) -> Optional[int]:
+        if card in UnoCardType:
+            return self.deck.get(card, 0)
         else:
             return None
 

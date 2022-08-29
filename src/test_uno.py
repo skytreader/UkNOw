@@ -15,8 +15,8 @@ class UnoDeckTests(unittest.TestCase):
     def test_draw(self, choice_mock):
         choice_mock.return_value = UnoCardType.RED_0
         self.assertEqual(choice_mock.return_value, self.deck.draw())
-        self.assertEqual(0, self.deck.deck[choice_mock.return_value])
-        self.assertTrue(choice_mock.return_value not in self.deck.non_zeros)
+        self.assertEqual(0, self.deck.count(choice_mock.return_value))
+        self.assertTrue(choice_mock.return_value not in self.deck.deck.keys())
 
     def test_draw_to_end(self):
         for _ in range(108):
