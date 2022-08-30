@@ -25,6 +25,14 @@ class UnoDeckTests(unittest.TestCase):
         self.assertIsNone(self.deck.draw())
         self.assertEqual(0, len(self.deck))
 
+    def test_remove_and_count(self):
+        self.assertEqual(2, self.deck.count(UnoCardType.BLUE_1))
+        self.deck.remove(UnoCardType.BLUE_1)
+        self.assertEqual(1, self.deck.count(UnoCardType.BLUE_1))
+        self.deck.remove(UnoCardType.BLUE_1)
+        self.assertEqual(0, self.deck.count(UnoCardType.BLUE_1))
+        self.assertRaises(Exception, self.deck.remove, UnoCardType.BLUE_1)
+
 class CardPlayRequirementTest(unittest.TestCase):
 
     def test_satisfies_numeric_cards(self):

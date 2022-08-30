@@ -1,4 +1,4 @@
-from typing import Dict, Literal, Optional, Set
+from typing import Dict, Iterable, Literal, Optional, Set
 
 import enum
 import random
@@ -52,8 +52,8 @@ class UnoDeck(object):
 
     def draw(self):
         """
-        Randomly gets a card from the deck. This effective removes the card from
-        the deck.
+        Randomly gets a card from the deck. This effectively removes the card
+        from the deck.
         """
         ks = list(self.deck.keys())
         if ks:
@@ -66,6 +66,14 @@ class UnoDeck(object):
             return card
         else:
             return None
+
+    def remove(self, card):
+        """
+        Remove that specific card from the deck.
+        """
+        self.deck[card] -= 1
+        if not self.deck[card]:
+            del self.deck[card]
 
     def count(self, card) -> Optional[int]:
         if card in UnoCardType:
@@ -101,3 +109,30 @@ class PlayerActionConstraints(object):
     def __init__(self, must_draw: int, must_play: CardPlayRequirement):
         self.must_draw = must_draw
         self.must_play = must_play
+
+class GameStateTracker(object):
+    """
+    Keeps track of the game state _from the perspective of one player_ and gives
+    you odds for the best move.
+    """
+
+    def __init__(self, player_hand: Iterable, other_players_card_counts: Iterable[int]):
+        self.player_hand = player_hand
+        self.other_players_card_counts = other_players_card_counts
+
+        self.deck = UnoDeck()
+        for card in self.player_hand:
+            self.deck.remove(card)
+
+        # This is a parallel array to other_players_card_counts. This keeps
+        # track of play requirements which the corresponding player was unable
+        # to fulfill. This only keeps track of the _last_ such unfulfilled
+        # requirement.
+        self.unfulfilled_requirements_monitor: Iterable[CardPlayRequirement] = {}
+
+    def card_requirement_probability(self, card, next_player):
+        """
+        Given a card (in hand) what are the odds that the next player can
+        fulfill the move requirement?
+        """
+        pass
