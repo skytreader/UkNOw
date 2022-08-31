@@ -1,4 +1,5 @@
-from typing import Dict, Iterable, Literal, Optional, Set
+from collections import Counter
+from typing import Any, Dict, List, Literal, Optional, Set
 
 import enum
 import random
@@ -116,19 +117,24 @@ class GameStateTracker(object):
     you odds for the best move.
     """
 
-    def __init__(self, player_hand: Iterable, other_players_card_counts: Iterable[int]):
+    def __init__(self, player_hand: List, other_players_card_counts: List[int]):
         self.player_hand = player_hand
         self.other_players_card_counts = other_players_card_counts
 
-        self.deck = UnoDeck()
+        # We make use of an `UnoDeck` instance to keep track of cards we haven't
+        # seen yet (i.e., not in hand nor in discarded).
+        self.unseen_cards = UnoDeck()
         for card in self.player_hand:
-            self.deck.remove(card)
+            self.unseen_cards.remove(card)
 
         # This is a parallel array to other_players_card_counts. This keeps
         # track of play requirements which the corresponding player was unable
         # to fulfill. This only keeps track of the _last_ such unfulfilled
         # requirement.
-        self.unfulfilled_requirements_monitor: Iterable[CardPlayRequirement] = {}
+        self.unfulfilled_requirements_monitor: List[Optional[CardPlayRequirement]] = [
+            None for _ in other_players_card_counts
+        ]
+        self.discard_pile: Counter = Counter()
 
     def card_requirement_probability(self, card, next_player):
         """
@@ -136,3 +142,26 @@ class GameStateTracker(object):
         fulfill the move requirement?
         """
         pass
+
+    def count_deck(self) -> int:
+        return len(self.unseen_cards) - sum(self.other_players_card_counts)
+
+    # type hint: card should be Optional[UnoCardType]
+    def other_player_played(
+            self,
+            player: int,
+            play_req: CardPlayRequirement,
+            card: Optional[Any] = None
+        ):
+        if card is not None:
+            self.unseen_cards.remove(card)
+            self.discard_pile[card] += 1
+            self.other_players_card_counts[player] -= 1
+            assert self.other_players_card_counts[player] >= 0
+        else:
+            self.unfulfilled_requirements_monitor[player] = play_req
+
+    def other_player_drew(self, player: int, num_cards: int):
+        if num_cards <= 0:
+            raise ValueError("Players must draw at least one card.")
+        self.other_players_card_counts[player] += num_cards
