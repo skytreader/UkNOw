@@ -1,4 +1,6 @@
-from .uno import CardPlayRequirement, UnoDeck, UnoCardType
+from .uno import CardPlayRequirement, GameStateTracker, UnoDeck, UnoCardType
+
+from collections import Counter
 
 import unittest
 import unittest.mock
@@ -54,3 +56,30 @@ class CardPlayRequirementTest(unittest.TestCase):
         self.assertTrue(require_wildcard.is_satisfied(UnoCardType.WILDFOUR.name))
         self.assertFalse(require_wildcard.is_satisfied(UnoCardType.RED_0.name))
         self.assertFalse(require_wildcard.is_satisfied("GREEN"))
+
+class GameStateTrackerTest(unittest.TestCase):
+    """
+    Testing strategy: we instantiate fields that basically mimic an ongoing
+    game. Then the GameStateTracker instance is fed "scenarios" of the game
+    happening. We can then check that this corresponds to the game we are
+    simulating.
+    """
+
+    def setUp(self):
+        # Create a game state that reflects the initial state of an Uno game.
+        self.deck = UnoDeck()
+        self.this_player = [self.deck.draw() for _ in range(7)]
+        # Other players will draw cards; we don't care what those cards are
+        for _ in range(3):
+            for __ in range(7):
+                self.deck.draw()
+
+        self.current_discard = self.deck.draw()
+        self.game_state_tracker = GameStateTracker(
+            self.this_player,
+            [7, 7, 7],
+            Counter([self.current_discard])
+        )
+
+    def test_count(self):
+        self.assertEqual(len(self.deck), self.game_state_tracker.count_deck())

@@ -117,7 +117,12 @@ class GameStateTracker(object):
     you odds for the best move.
     """
 
-    def __init__(self, player_hand: List, other_players_card_counts: List[int]):
+    def __init__(
+            self,
+            player_hand: List,
+            other_players_card_counts: List[int],
+            discard_pile: Counter
+        ):
         self.player_hand = player_hand
         self.other_players_card_counts = other_players_card_counts
 
@@ -134,7 +139,7 @@ class GameStateTracker(object):
         self.unfulfilled_requirements_monitor: List[Optional[CardPlayRequirement]] = [
             None for _ in other_players_card_counts
         ]
-        self.discard_pile: Counter = Counter()
+        self.discard_pile: Counter = discard_pile
 
     def card_requirement_probability(self, card, next_player):
         """
@@ -144,10 +149,16 @@ class GameStateTracker(object):
         pass
 
     def count_deck(self) -> int:
-        return len(self.unseen_cards) - sum(self.other_players_card_counts)
+        return (
+            len(self.unseen_cards)
+            - sum(self.other_players_card_counts)
+            - self.discard_pile.total()
+        )
+
+    # `ev_` methods translate directly to in-game events
 
     # type hint: card should be Optional[UnoCardType]
-    def other_player_played(
+    def ev_other_player_played(
             self,
             player: int,
             play_req: CardPlayRequirement,
@@ -161,7 +172,7 @@ class GameStateTracker(object):
         else:
             self.unfulfilled_requirements_monitor[player] = play_req
 
-    def other_player_drew(self, player: int, num_cards: int):
+    def ev_other_player_drew(self, player: int, num_cards: int):
         if num_cards <= 0:
             raise ValueError("Players must draw at least one card.")
         self.other_players_card_counts[player] += num_cards
