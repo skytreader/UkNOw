@@ -1,29 +1,60 @@
 from collections import Counter
-from typing import Any, Dict, List, Literal, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 import enum
 import random
 
-CARD_COLORS = ("RED", "YELLOW", "GREEN", "BLUE")
-CARD_COLORS_TYPE = Literal["RED", "YELLOW", "GREEN", "BLUE"]
-ACTION_CARDS = ("SKIP", "DRAWTWO", "REVERSE")
+@enum.unique
+class CardColor(enum.Enum):
+    RED = enum.auto()
+    YELLOW = enum.auto()
+    GREEN = enum.auto()
+    BLUE = enum.auto()
 
-def create_cardtype_enum():
-    deck = {
-        "WILD": enum.auto(),
-        "WILDFOUR": enum.auto(),
-    }
+@enum.unique
+class CardAction(enum.Enum):
+    SKIP = enum.auto()
+    DRAWTWO = enum.auto()
+    DRAWFOUR = enum.auto()
+    REVERSE = enum.auto()
 
-    for c in CARD_COLORS:
-        for i in range(10):
-            deck["_".join((c, str(i)))] = enum.auto()
+def _attr_cmp(a, b):
+    return a is not None and a is b
 
-        for label in ACTION_CARDS:
-            deck["_".join((c, label))] = enum.auto()
+class UnoCard(object):
 
-    return enum.Enum("UnoCard", deck)
+    def __init__(
+            self,
+            color: Optional[CardColor] = None, 
+            number: Optional[int] = None,
+            action: Optional[CardAction] = None
+        ):
+        self.color = color
+        self.number = number
+        self.action = action
 
-UnoCardType = create_cardtype_enum()
+    @staticmethod
+    def is_wildcard(card: "UnoCard"):
+        return card.color is None and card.number is None
+
+    def matches(self, card: "UnoCard"):
+        return (
+            UnoCard.is_wildcard(self) or
+            UnoCard.is_wildcard(card) or
+            _attr_cmp(self.color, card.color) or
+            _attr_cmp(self.number, card.number) or
+            _attr_cmp(self.action, card.action)
+        )
+
+    def __hash__(self):
+        return hash((self.color, self.number, self.action))
+    
+    def __eq__(self, other):
+        return (
+            self.color is other.color and
+            self.number is other.number and
+            self.action is other.action
+        )
 
 class UnoDeck(object):
     """
@@ -32,21 +63,21 @@ class UnoDeck(object):
     """
 
     def __init__(self):
-        self.deck: Dict[UnoCardType, int] = {}
-        self.deck[UnoCardType.WILD] = 4
-        self.deck[UnoCardType.WILDFOUR] = 4
+        # This is a Dict rather than a counter so we can easily remove card
+        # instances that are exhausted in this deck instance.
+        self.deck: Dict[UnoCard, int]= {}
+        self.deck[UnoCard()] = 4
+        self.deck[UnoCard(action=CardAction.DRAWFOUR)] = 4
 
-        for color in CARD_COLORS:
-            card_zero = UnoCardType["%s_0" % color]
-            self.deck[card_zero] = 1
+        for color in list(CardColor):
+            self.deck[UnoCard(color, 0)] = 1
 
             for n in range(1, 10):
-                card_n = UnoCardType["%s_%d" % (color, n)]
-                self.deck[card_n] = 2
+                self.deck[UnoCard(color, n)] = 2
 
-            for act in ACTION_CARDS:
-                action_card = UnoCardType["%s_%s" % (color, act)]
-                self.deck[action_card] = 2
+            for act in list(CardAction):
+                if act != CardAction.DRAWFOUR:
+                    self.deck[UnoCard(color=color, action=act)] = 2
 
     def __len__(self):
         return sum([self.deck[k] for k in self.deck.keys()])
@@ -68,7 +99,7 @@ class UnoDeck(object):
         else:
             return None
 
-    def remove(self, card):
+    def remove(self, card: UnoCard):
         """
         Remove that specific card from the deck.
         """
@@ -76,40 +107,8 @@ class UnoDeck(object):
         if not self.deck[card]:
             del self.deck[card]
 
-    def count(self, card) -> Optional[int]:
-        if card in UnoCardType:
-            return self.deck.get(card, 0)
-        else:
-            return None
-
-class CardPlayRequirement(object):
-
-    def __init__(self, color: CARD_COLORS_TYPE, number: Optional[int] = None):
-        self.color = color
-        self.number = number
-
-    def is_satisfied(self, card: str) -> bool:
-        """
-        You can get valid arguments via the `name` field of the `UnoCardType`
-        enum.
-        """
-        if card in (UnoCardType.WILD.name, UnoCardType.WILDFOUR.name):
-            return True
-
-        cardparse = card.split("_")
-        if self.number is not None:
-            try:
-                return self.color == cardparse[0] or self.number == int(cardparse[1])
-            except ValueError:
-                return False
-        else:
-            return len(cardparse) == 2 and self.color == cardparse[0]
-
-class PlayerActionConstraints(object):
-
-    def __init__(self, must_draw: int, must_play: CardPlayRequirement):
-        self.must_draw = must_draw
-        self.must_play = must_play
+    def count(self, card: UnoCard) -> Optional[int]:
+        return self.deck.get(card, 0)
 
 class GameStateTracker(object):
     """
@@ -136,7 +135,7 @@ class GameStateTracker(object):
         # track of play requirements which the corresponding player was unable
         # to fulfill. This only keeps track of the _last_ such unfulfilled
         # requirement.
-        self.unfulfilled_requirements_monitor: List[Optional[CardPlayRequirement]] = [
+        self.unfulfilled_requirements_monitor: List[Optional[UnoCard]] = [
             None for _ in other_players_card_counts
         ]
         self.discard_pile: Counter = discard_pile
@@ -157,12 +156,10 @@ class GameStateTracker(object):
 
     # `ev_` methods translate directly to in-game events
 
-    # type hint: card should be Optional[UnoCardType]
     def ev_other_player_played(
             self,
             player: int,
-            play_req: CardPlayRequirement,
-            card: Optional[Any] = None
+            card: Optional[UnoCard] = None
         ):
         if card is not None:
             self.unseen_cards.remove(card)
@@ -170,7 +167,7 @@ class GameStateTracker(object):
             self.other_players_card_counts[player] -= 1
             assert self.other_players_card_counts[player] >= 0
         else:
-            self.unfulfilled_requirements_monitor[player] = play_req
+            self.unfulfilled_requirements_monitor[player] = card
 
     def ev_other_player_drew(self, player: int, num_cards: int):
         if num_cards <= 0:

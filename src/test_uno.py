@@ -1,4 +1,4 @@
-from .uno import CardPlayRequirement, GameStateTracker, UnoDeck, UnoCardType
+from .uno import CardAction, CardColor, GameStateTracker, UnoCard, UnoDeck
 
 from collections import Counter
 
@@ -15,7 +15,7 @@ class UnoDeckTests(unittest.TestCase):
 
     @unittest.mock.patch("random.choice")
     def test_draw(self, choice_mock):
-        choice_mock.return_value = UnoCardType.RED_0
+        choice_mock.return_value = UnoCard(CardColor.RED, 0)
         self.assertEqual(choice_mock.return_value, self.deck.draw())
         self.assertEqual(0, self.deck.count(choice_mock.return_value))
         self.assertTrue(choice_mock.return_value not in self.deck.deck.keys())
@@ -28,34 +28,48 @@ class UnoDeckTests(unittest.TestCase):
         self.assertEqual(0, len(self.deck))
 
     def test_remove_and_count(self):
-        self.assertEqual(2, self.deck.count(UnoCardType.BLUE_1))
-        self.deck.remove(UnoCardType.BLUE_1)
-        self.assertEqual(1, self.deck.count(UnoCardType.BLUE_1))
-        self.deck.remove(UnoCardType.BLUE_1)
-        self.assertEqual(0, self.deck.count(UnoCardType.BLUE_1))
-        self.assertRaises(Exception, self.deck.remove, UnoCardType.BLUE_1)
+        blue1 = UnoCard(CardColor.BLUE, 1)
+        self.assertEqual(2, self.deck.count(blue1))
+        self.deck.remove(blue1)
+        self.assertEqual(1, self.deck.count(blue1))
+        self.deck.remove(blue1)
+        self.assertEqual(0, self.deck.count(blue1))
+        self.assertRaises(Exception, self.deck.remove, blue1)
 
-class CardPlayRequirementTest(unittest.TestCase):
+class UnoCardTest(unittest.TestCase):
 
-    def test_satisfies_numeric_cards(self):
-        require_green_0 = CardPlayRequirement("GREEN", 0)
-        self.assertTrue(require_green_0.is_satisfied(UnoCardType.GREEN_1.name))
-        self.assertTrue(require_green_0.is_satisfied(UnoCardType.RED_0.name))
-        self.assertTrue(require_green_0.is_satisfied(UnoCardType.GREEN_SKIP.name))
-        self.assertTrue(require_green_0.is_satisfied(UnoCardType.WILD.name))
-        self.assertTrue(require_green_0.is_satisfied(UnoCardType.WILDFOUR.name))
-        self.assertFalse(require_green_0.is_satisfied(UnoCardType.RED_1.name))
-        self.assertFalse(require_green_0.is_satisfied(UnoCardType.RED_SKIP.name))
+    def test_matches_numeric_cards(self):
+        green0 = UnoCard(CardColor.GREEN, 0)
+        self.assertTrue(green0.matches(UnoCard(CardColor.GREEN, 1)))
+        self.assertTrue(green0.matches(UnoCard(CardColor.RED, 0)))
+        self.assertTrue(green0.matches(
+            UnoCard(color=CardColor.GREEN, action=CardAction.SKIP))
+        )
+        # This is the wild card
+        self.assertTrue(green0.matches(UnoCard()))
+        # This is the wild four card
+        self.assertTrue(green0.matches(UnoCard(action=CardAction.DRAWFOUR)))
+        self.assertFalse(green0.matches(UnoCard(CardColor.RED, 1)))
+        self.assertFalse(green0.matches(
+            UnoCard(CardColor.RED, action=CardAction.SKIP))
+        )
 
-    def test_wildcard(self):
-        # The wildcard requirement is characterized as having no number specified
-        require_wildcard = CardPlayRequirement("GREEN")
-        self.assertTrue(require_wildcard.is_satisfied(UnoCardType.GREEN_1.name))
-        self.assertTrue(require_wildcard.is_satisfied(UnoCardType.GREEN_0.name))
-        self.assertTrue(require_wildcard.is_satisfied(UnoCardType.WILD.name))
-        self.assertTrue(require_wildcard.is_satisfied(UnoCardType.WILDFOUR.name))
-        self.assertFalse(require_wildcard.is_satisfied(UnoCardType.RED_0.name))
-        self.assertFalse(require_wildcard.is_satisfied("GREEN"))
+    def test_matches_wildcard(self):
+        # When a player plays a wildcard, it "transforms" to a card with only a
+        # color attribute which the next player must then match.
+        green = UnoCard(CardColor.GREEN)
+        self.assertTrue(green.matches(UnoCard(CardColor.GREEN, 1)))
+        self.assertTrue(green.matches(
+            UnoCard(color=CardColor.GREEN, action=CardAction.SKIP))
+        )
+        # This is the wild card
+        self.assertTrue(green.matches(UnoCard()))
+        # This is the wild four card
+        self.assertTrue(green.matches(UnoCard(action=CardAction.DRAWFOUR)))
+        self.assertFalse(green.matches(UnoCard(CardColor.RED, 1)))
+        self.assertFalse(green.matches(
+            UnoCard(CardColor.RED, action=CardAction.SKIP))
+        )
 
 class GameStateTrackerTest(unittest.TestCase):
     """
