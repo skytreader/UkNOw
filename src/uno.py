@@ -110,6 +110,25 @@ class UnoDeck(object):
     def count(self, card: UnoCard) -> Optional[int]:
         return self.deck.get(card, 0)
 
+class CardCountsIndex(object):
+
+    def __init__(self):
+        self.total_counts: Counter[UnoCard] = Counter()
+        self.color_counts: Counter[CardColor] = Counter()
+        self.number_counts: Counter[int] = Counter()
+        self.action_counts: Counter[CardAction] = Counter()
+
+    def count(self, card: UnoCard):
+        self.total_counts[card] += 1
+        if card.color is not None:
+            self.color_counts[card.color] += 1
+
+        if card.number is not None:
+            self.number_counts[card.number] += 1
+
+        if card.action is not None:
+            self.action_counts[card.action] += 1
+
 class GameStateTracker(object):
     """
     Keeps track of the game state _from the perspective of one player_ and gives
@@ -120,7 +139,7 @@ class GameStateTracker(object):
             self,
             player_hand: List,
             other_players_card_counts: List[int],
-            discard_pile: Counter
+            seen_counter: CardCountsIndex
         ):
         self.player_hand = player_hand
         self.other_players_card_counts = other_players_card_counts
@@ -138,7 +157,7 @@ class GameStateTracker(object):
         self.unfulfilled_requirements_monitor: List[Optional[UnoCard]] = [
             None for _ in other_players_card_counts
         ]
-        self.discard_pile: Counter = discard_pile
+        self.seen_counter = seen_counter
 
     def card_requirement_probability(self, card, next_player):
         """
@@ -151,7 +170,7 @@ class GameStateTracker(object):
         return (
             len(self.unseen_cards)
             - sum(self.other_players_card_counts)
-            - self.discard_pile.total()
+            - self.seen_counter.total_counts.total()
         )
 
     # `ev_` methods translate directly to in-game events
@@ -163,7 +182,7 @@ class GameStateTracker(object):
         ):
         if card is not None:
             self.unseen_cards.remove(card)
-            self.discard_pile[card] += 1
+            self.seen_counter.count(card)
             self.other_players_card_counts[player] -= 1
             assert self.other_players_card_counts[player] >= 0
         else:

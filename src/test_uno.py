@@ -1,4 +1,4 @@
-from .uno import CardAction, CardColor, GameStateTracker, UnoCard, UnoDeck
+from .uno import CardAction, CardColor, CardCountsIndex, GameStateTracker, UnoCard, UnoDeck
 
 from collections import Counter
 
@@ -71,6 +71,35 @@ class UnoCardTest(unittest.TestCase):
             UnoCard(CardColor.RED, action=CardAction.SKIP))
         )
 
+class CardCountsIndexTest(unittest.TestCase):
+
+    def setUp(self):
+        self.counter = CardCountsIndex()
+
+    def assert_total_counts(self, color: int, number: int, action: int, total: int):
+        self.assertEqual(color, self.counter.color_counts.total())
+        self.assertEqual(number, self.counter.number_counts.total())
+        self.assertEqual(action, self.counter.action_counts.total())
+        self.assertEqual(total, self.counter.total_counts.total())
+
+    def test_count(self):
+        self.counter.count(UnoCard(CardColor.YELLOW, 0))
+        self.assertEqual(1, self.counter.color_counts[CardColor.YELLOW])
+        self.assertEqual(1, self.counter.number_counts[0])
+        self.assertEqual(1, self.counter.total_counts[UnoCard(CardColor.YELLOW, 0)])
+        self.assert_total_counts(1, 1, 0, 1)
+
+        self.counter.count(UnoCard(CardColor.RED, 0))
+        self.assertEqual(1, self.counter.color_counts[CardColor.RED])
+        self.assertEqual(2, self.counter.number_counts[0])
+        self.assertEqual(1, self.counter.total_counts[UnoCard(CardColor.RED, 0)])
+        self.assert_total_counts(2, 2, 0, 2)
+
+        self.counter.count(UnoCard(CardColor.RED, action=CardAction.SKIP))
+        self.assertEqual(2, self.counter.color_counts[CardColor.RED])
+        self.assertEqual(1, self.counter.action_counts[CardAction.SKIP])
+        self.assert_total_counts(3, 2, 1, 3)
+
 class GameStateTrackerTest(unittest.TestCase):
     """
     Testing strategy: we instantiate fields that basically mimic an ongoing
@@ -89,10 +118,12 @@ class GameStateTrackerTest(unittest.TestCase):
                 self.deck.draw()
 
         self.current_discard = self.deck.draw()
+        counter = CardCountsIndex()
+        counter.count(self.current_discard)
         self.game_state_tracker = GameStateTracker(
             self.this_player,
             [7, 7, 7],
-            Counter([self.current_discard])
+            counter
         )
 
     def test_count(self):
