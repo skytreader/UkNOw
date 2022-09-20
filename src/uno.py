@@ -1,4 +1,5 @@
 from collections import Counter
+from .combinatorics import CombinationCount
 from typing import Any, Dict, List, Optional, Set
 
 import enum
@@ -61,23 +62,33 @@ class UnoDeck(object):
     Stateful representation of an Uno Deck. Each method is constant time
     (i.e., Big-O is bounded by the 108 card count, never an integral multiple).
     """
+    WILDCARD_COUNT = 4
+    DRAWFOUR_COUNT = 4
+    ZERO_COUNT = 1
+    NONZERO_COUNT = 2
+    ACTION_CARD_COUNT = 2
+
+    PER_COLOR_COUNT = 25
+    PER_ZERO_COUNT = ZERO_COUNT * len(CardColor)
+    PER_NONZERO_COUNT = NONZERO_COUNT * len(CardColor)
+    PER_ACTION_CARD_COUNT = ACTION_CARD_COUNT * len(CardColor)
 
     def __init__(self):
-        # This is a Dict rather than a counter so we can easily remove card
+        # This is a Dict rather than a Counter so we can easily remove card
         # instances that are exhausted in this deck instance.
         self.deck: Dict[UnoCard, int]= {}
-        self.deck[UnoCard()] = 4
-        self.deck[UnoCard(action=CardAction.DRAWFOUR)] = 4
+        self.deck[UnoCard()] = UnoDeck.WILDCARD_COUNT
+        self.deck[UnoCard(action=CardAction.DRAWFOUR)] = UnoDeck.DRAWFOUR_COUNT
 
         for color in list(CardColor):
-            self.deck[UnoCard(color, 0)] = 1
+            self.deck[UnoCard(color, 0)] = UnoDeck.ZERO_COUNT
 
             for n in range(1, 10):
-                self.deck[UnoCard(color, n)] = 2
+                self.deck[UnoCard(color, n)] = UnoDeck.NONZERO_COUNT
 
             for act in list(CardAction):
                 if act != CardAction.DRAWFOUR:
-                    self.deck[UnoCard(color=color, action=act)] = 2
+                    self.deck[UnoCard(color=color, action=act)] = UnoDeck.ACTION_CARD_COUNT
 
     def __len__(self):
         return sum([self.deck[k] for k in self.deck.keys()])
@@ -145,10 +156,13 @@ class GameStateTracker(object):
         self.other_players_card_counts = other_players_card_counts
 
         # We make use of an `UnoDeck` instance to keep track of cards we haven't
-        # seen yet (i.e., not in hand nor in discarded).
+        # seen yet (i.e., not in hand nor in discarded, in other words, possibly
+        # in play).
         self.unseen_cards = UnoDeck()
+        self.seen_counter = seen_counter
+        self.ORIGINAL_CARD_COUNT = len(self.unseen_cards)
         for card in self.player_hand:
-            self.unseen_cards.remove(card)
+            self.__see_card(card)
 
         # This is a parallel array to other_players_card_counts. This keeps
         # track of play requirements which the corresponding player was unable
@@ -157,23 +171,43 @@ class GameStateTracker(object):
         self.unfulfilled_requirements_monitor: List[Optional[UnoCard]] = [
             None for _ in other_players_card_counts
         ]
-        self.seen_counter = seen_counter
+        self.nCr = CombinationCount(self.ORIGINAL_CARD_COUNT)
 
     def card_requirement_probability(self, card, next_player):
         """
         Given a card (in hand) what are the odds that the next player can
         fulfill the move requirement?
         """
-        pass
+        assert (
+            (self.seen_counter.total_counts.total() + len(self.unseen_cards)) ==
+            self.ORIGINAL_CARD_COUNT
+        )
+        # TODO Take wildcards into account
+        # What are the odds next player has a card of the same color?
+        remaining_color_unseen = (
+            UnoDeck.PER_COLOR_COUNT - self.seen_counter.color_counts[card.color]
+        )
+
+        # What are the odds next player has a card of the same number?
+        remaining_number_unseen = (
+            (UnoDeck.PER_NONZERO_COUNT if card.number else UnoDeck.PER_ZERO_COUNT)
+            - self.seen_counter.number_counts[card.number]
+        )
 
     def count_deck(self) -> int:
         return (
             len(self.unseen_cards)
             - sum(self.other_players_card_counts)
-            - self.seen_counter.total_counts.total()
         )
 
     # `ev_` methods translate directly to in-game events
+
+    def __see_card(self, card: UnoCard):
+        self.unseen_cards.remove(card)
+        self.seen_counter.count(card)
+
+    def ev_initial_play(self, card: UnoCard):
+        self.__see_card(card)
 
     def ev_other_player_played(
             self,
@@ -181,8 +215,7 @@ class GameStateTracker(object):
             card: Optional[UnoCard] = None
         ):
         if card is not None:
-            self.unseen_cards.remove(card)
-            self.seen_counter.count(card)
+            self.__see_card(card)
             self.other_players_card_counts[player] -= 1
             assert self.other_players_card_counts[player] >= 0
         else:
@@ -192,3 +225,8 @@ class GameStateTracker(object):
         if num_cards <= 0:
             raise ValueError("Players must draw at least one card.")
         self.other_players_card_counts[player] += num_cards
+
+    def ev_player_drew(self, player: int, cards: List[UnoCard]):
+        for c in cards:
+            self.__see_card(c)
+            self.player_hand.append(c)

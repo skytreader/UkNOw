@@ -125,6 +125,10 @@ class GameStateTrackerTest(unittest.TestCase):
             [7, 7, 7],
             counter
         )
+        self.game_state_tracker.ev_initial_play(self.current_discard)
 
     def test_count(self):
         self.assertEqual(len(self.deck), self.game_state_tracker.count_deck())
+
+    def test_player_based_deck_changes(self):
+        drawn = self.deck.draw()
