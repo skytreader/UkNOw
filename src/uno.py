@@ -171,9 +171,9 @@ class GameStateTracker(object):
         self.unfulfilled_requirements_monitor: List[Optional[UnoCard]] = [
             None for _ in other_players_card_counts
         ]
-        self.nCr = CombinationCount(self.ORIGINAL_CARD_COUNT)
+        self.nCr = CombinationCount(self.ORIGINAL_CARD_COUNT).nCr
 
-    def card_requirement_probability(self, card, next_player):
+    def card_requirement_probability(self, card: UnoCard, next_player: int) -> float:
         """
         Given a card (in hand) what are the odds that the next player can
         fulfill the move requirement?
@@ -184,14 +184,45 @@ class GameStateTracker(object):
         )
         # TODO Take wildcards into account
         # What are the odds next player has a card of the same color?
-        remaining_color_unseen = (
-            UnoDeck.PER_COLOR_COUNT - self.seen_counter.color_counts[card.color]
-        )
+        player_hands_without_color_frac = 0.0
+        if card.color is not None:
+            remaining_color_unseen = (
+                UnoDeck.PER_COLOR_COUNT - self.seen_counter.color_counts[card.color]
+            )
+            player_hand_universe = self.nCr(
+                len(self.unseen_cards),
+                self.other_players_card_counts[next_player]
+            )
+            player_hands_without_color = self.nCr(
+                len(self.unseen_cards) - remaining_color_unseen,
+                self.other_players_card_counts[next_player]
+            )
+            player_hands_without_color_frac = (
+                player_hands_without_color / player_hand_universe
+            )
+        assert player_hands_without_color_frac <= 1
+        player_hand_has_color_prob = 1 - player_hands_without_color_frac
 
         # What are the odds next player has a card of the same number?
-        remaining_number_unseen = (
-            (UnoDeck.PER_NONZERO_COUNT if card.number else UnoDeck.PER_ZERO_COUNT)
-            - self.seen_counter.number_counts[card.number]
+        player_hands_without_number_frac = 0.0
+        if card.number is not None:
+            remaining_number_unseen = (
+                (UnoDeck.PER_NONZERO_COUNT if card.number else UnoDeck.PER_ZERO_COUNT)
+                - self.seen_counter.number_counts[card.number]
+            )
+            player_hands_without_number = self.nCr(
+                len(self.unseen_cards) - remaining_number_unseen,
+                self.other_players_card_counts[next_player]
+            )
+            player_hands_without_number_frac = (
+                player_hands_without_number / player_hand_universe
+            )
+        assert player_hands_without_number_frac <= 1
+        player_hand_has_number_prob = 1 - player_hands_without_number_frac
+
+        # FIXME These hands have an intersection; does it matter?
+        return (
+            player_hand_has_color_prob * player_hand_has_number_prob
         )
 
     def count_deck(self) -> int:
