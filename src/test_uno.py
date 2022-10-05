@@ -2,6 +2,7 @@ from .uno import CardAction, CardColor, CardCountsIndex, GameStateTracker, UnoCa
 
 from collections import Counter
 
+import random
 import unittest
 import unittest.mock
 
@@ -111,24 +112,61 @@ class GameStateTrackerTest(unittest.TestCase):
     def setUp(self):
         # Create a game state that reflects the initial state of an Uno game.
         self.deck = UnoDeck()
-        self.this_player = [self.deck.draw() for _ in range(7)]
+        this_player = [self.deck.draw() for _ in range(7)]
         # Other players will draw cards; we don't care what those cards are
         for _ in range(3):
             for __ in range(7):
                 self.deck.draw()
 
         self.current_discard = self.deck.draw()
-        counter = CardCountsIndex()
-        counter.count(self.current_discard)
         self.game_state_tracker = GameStateTracker(
-            self.this_player,
-            [7, 7, 7],
-            counter
+            this_player,
+            [7, 7, 7]
         )
         self.game_state_tracker.ev_initial_play(self.current_discard)
+        self.assertEqual(8, self.game_state_tracker.seen_counter.total_counts.total())
+        self.assertEqual(100, len(self.game_state_tracker.unseen_cards))
 
     def test_count(self):
         self.assertEqual(len(self.deck), self.game_state_tracker.count_deck())
 
     def test_player_based_deck_changes(self):
         drawn = self.deck.draw()
+        in_hand = self.game_state_tracker.player_hand.count(drawn)
+        self.game_state_tracker.ev_player_drew([drawn])
+        self.assertEqual(in_hand + 1, self.game_state_tracker.player_hand.count(drawn))
+
+    def test_card_requirement_probability_exhausted_color(self):
+        # Contrivance: do not play from hand
+        candidate_play = UnoCard(
+            random.choice(list(CardColor)),
+            random.choice(list(CardAction))
+        )
+
+        # Choose color because there is a chance the starting hand of a player
+        # is all action cards (i.e., .number is None, which means this loop
+        # won't terminate).
+        while candidate_play.color is None:
+            candidate_play = random.choice(self.game_state_tracker.player_hand)
+
+        # Contrived scenario: make this player play all the cards of the given
+        # color. Use a dummy deck so we don't have to manually enumerate cards.
+        dummy_deck = UnoDeck()
+        card = dummy_deck.draw()
+
+        while card is not None:
+            if card.color == candidate_play.color:
+                try:
+                    self.game_state_tracker.ev_player_played(card)
+                except KeyError:
+                    # Maybe card is already in someone else's hand...we don't care
+                    pass
+            card = dummy_deck.draw()
+
+        self.assertEqual(
+            0,
+            self.game_state_tracker.card_requirement_probability(
+                candidate_play,
+                0
+            )
+        )

@@ -1,6 +1,6 @@
 from collections import Counter
 from .combinatorics import CombinationCount
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional, Set
 
 import enum
 import random
@@ -150,7 +150,6 @@ class GameStateTracker(object):
             self,
             player_hand: List,
             other_players_card_counts: List[int],
-            seen_counter: CardCountsIndex
         ):
         self.player_hand = player_hand
         self.other_players_card_counts = other_players_card_counts
@@ -159,7 +158,7 @@ class GameStateTracker(object):
         # seen yet (i.e., not in hand nor in discarded, in other words, possibly
         # in play).
         self.unseen_cards = UnoDeck()
-        self.seen_counter = seen_counter
+        self.seen_counter = CardCountsIndex()
         self.ORIGINAL_CARD_COUNT = len(self.unseen_cards)
         for card in self.player_hand:
             self.__see_card(card)
@@ -178,6 +177,7 @@ class GameStateTracker(object):
         Given a card (in hand) what are the odds that the next player can
         fulfill the move requirement?
         """
+        print("assert debug %s" % (self.seen_counter.total_counts.total() + len(self.unseen_cards)))
         assert (
             (self.seen_counter.total_counts.total() + len(self.unseen_cards)) ==
             self.ORIGINAL_CARD_COUNT
@@ -221,8 +221,10 @@ class GameStateTracker(object):
         player_hand_has_number_prob = 1 - player_hands_without_number_frac
 
         # FIXME These hands have an intersection; does it matter?
+        # FIXME This must be an OR because these two possibilities are
+        # independent. However, can this return a value > 1?
         return (
-            player_hand_has_color_prob * player_hand_has_number_prob
+            player_hand_has_color_prob + player_hand_has_number_prob
         )
 
     def count_deck(self) -> int:
@@ -234,6 +236,10 @@ class GameStateTracker(object):
     # `ev_` methods translate directly to in-game events
 
     def __see_card(self, card: UnoCard):
+        # The order is important here to keep the idempotent property of this
+        # class. If seeing this card is "impossible", we want the unseen_cards
+        # remove call to throw an exception so the rest of the method won't
+        # happen anymore.
         self.unseen_cards.remove(card)
         self.seen_counter.count(card)
 
@@ -257,7 +263,10 @@ class GameStateTracker(object):
             raise ValueError("Players must draw at least one card.")
         self.other_players_card_counts[player] += num_cards
 
-    def ev_player_drew(self, player: int, cards: List[UnoCard]):
+    def ev_player_drew(self, cards: Iterable[UnoCard]):
         for c in cards:
             self.__see_card(c)
             self.player_hand.append(c)
+
+    def ev_player_played(self, card: UnoCard):
+        self.__see_card(card)
