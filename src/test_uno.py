@@ -137,15 +137,13 @@ class GameStateTrackerTest(unittest.TestCase):
         self.assertEqual(in_hand + 1, self.game_state_tracker.player_hand.count(drawn))
 
     def test_card_requirement_probability_exhausted_color(self):
-        # Contrivance: do not play from hand
-        candidate_play = UnoCard(
-            random.choice(list(CardColor)),
-            random.choice(list(CardAction))
-        )
+        """
+        Contrive a game state in which no other player can possibly answer the
+        card the player is going to play.
+        """
+        candidate_play = random.choice(self.game_state_tracker.player_hand)
 
-        # Choose color because there is a chance the starting hand of a player
-        # is all action cards (i.e., .number is None, which means this loop
-        # won't terminate).
+        # Just make sure we did not choose WILDCARD or DRAWFOUR
         while candidate_play.color is None:
             candidate_play = random.choice(self.game_state_tracker.player_hand)
 
@@ -155,7 +153,7 @@ class GameStateTrackerTest(unittest.TestCase):
         card = dummy_deck.draw()
 
         while card is not None:
-            if card.color == candidate_play.color:
+            if card.color == candidate_play.color or card.number == candidate_play.number:
                 try:
                     self.game_state_tracker.ev_player_played(card)
                 except KeyError:

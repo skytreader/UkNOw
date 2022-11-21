@@ -177,7 +177,6 @@ class GameStateTracker(object):
         Given a card (in hand) what are the odds that the next player can
         fulfill the move requirement?
         """
-        print("assert debug %s" % (self.seen_counter.total_counts.total() + len(self.unseen_cards)))
         assert (
             (self.seen_counter.total_counts.total() + len(self.unseen_cards)) ==
             self.ORIGINAL_CARD_COUNT
@@ -200,7 +199,7 @@ class GameStateTracker(object):
             player_hands_without_color_frac = (
                 player_hands_without_color / player_hand_universe
             )
-        assert player_hands_without_color_frac <= 1
+        assert 0 <= player_hands_without_color_frac <= 1
         player_hand_has_color_prob = 1 - player_hands_without_color_frac
 
         # What are the odds next player has a card of the same number?
@@ -217,7 +216,7 @@ class GameStateTracker(object):
             player_hands_without_number_frac = (
                 player_hands_without_number / player_hand_universe
             )
-        assert player_hands_without_number_frac <= 1
+        assert 0 <= player_hands_without_number_frac <= 1
         player_hand_has_number_prob = 1 - player_hands_without_number_frac
 
         # FIXME These hands have an intersection; does it matter?
