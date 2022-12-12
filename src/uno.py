@@ -220,11 +220,9 @@ class GameStateTracker(object):
         player_hand_has_number_prob = 1 - player_hands_without_number_frac
 
         # FIXME These hands have an intersection; does it matter?
-        # FIXME This must be an OR because these two possibilities are
-        # independent. However, can this return a value > 1?
         return (
             player_hand_has_color_prob + player_hand_has_number_prob
-        )
+        ) / 2
 
     def count_deck(self) -> int:
         return (

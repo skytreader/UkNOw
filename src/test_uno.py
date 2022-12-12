@@ -168,3 +168,9 @@ class GameStateTrackerTest(unittest.TestCase):
                 0
             )
         )
+
+    def test_card_requirement_probability_first_turn(self):
+        for card in self.game_state_tracker.player_hand:
+            p = self.game_state_tracker.card_requirement_probability(card, 0)
+            self.assertGreater(p, 0)
+            self.assertLessEqual(p, 1)
